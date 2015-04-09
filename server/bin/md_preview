@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+
+var fs = require('fs');
+var config = require('config');
+var app = require('../app');
+app.set('port', process.env.PORT || config.default_port || 3000);
+var io = require('../modules/io');
+
+var path2data = function(filepath, cb){
+    fs.readFile(filepath, "utf8", function (err, data) {
+        cb(data);
+    });
+};
+
+var gazeTargetFile = function(filepath){
+    fs.open(filepath, 'r', 384 /*=0600*/, function(err, fd) {
+        if (err) {
+            console.log('File not found');
+        }
+        fd && fs.close(fd, function(err) {
+            path2data(filepath, function(data){
+                io.onTargetFileChanged(data);
+            });
+            fs.watchFile(filepath, function (curr, prev) {
+                path2data(filepath, function(data){
+                    io.onTargetFileChanged(data);
+                });
+            });
+            io.start();
+        });
+    });
+};
+
+var program = require('commander')
+    .version('0.0.1')
+    .usage('<target file>')
+    .parse(process.argv);
+
+if(!program.args.length) {
+    program.help();
+    return;
+}
+
+gazeTargetFile(program.args[0]);
+
